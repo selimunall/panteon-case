@@ -337,10 +337,13 @@ Expected: `migrated` then `seeded 500 players for <weekId>`. Note the printed `w
 
 - [ ] **Step 2: Boot the server**
 
+`index.ts` validates env with no defaults (unlike the migrate/seed scripts), so it needs a `.env`. Create one at the repo root from the example (it is git-ignored), then boot with Node's `--env-file`:
+
 ```bash
-cd server && npx tsx src/index.ts
+cp .env.example .env   # once
+cd server && npx tsx --env-file=../.env src/index.ts
 ```
-Expected: `server listening on http://0.0.0.0:3000`. Leave it running; use a second terminal for the curls.
+Expected: `server listening on http://0.0.0.0:3000`. (The `dev` script already passes `--env-file=../.env`.) Leave it running; use a second terminal for the curls.
 
 - [ ] **Step 3: Post an earn for a fresh player and confirm it applies**
 

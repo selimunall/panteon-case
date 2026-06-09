@@ -53,6 +53,10 @@ export async function runSeed(opts: SeedOptions): Promise<{ weekId: string; coun
     const { setProfiles } = await import('../services/profile.js');
     await setProfiles(redis, playerRows);
 
+    // Seed the live prize pool as 2% of total seeded earnings so the UI shows a real figure.
+    const totalEarned = scoreRows.reduce((s, r) => s + r.totalEarned, 0n);
+    await redis.set(`pool:week:${weekId}`, String(Number(totalEarned) * 0.02));
+
     await ensureEventIndexes(mongo.db);
     await mongo.db.collection('earning_events').deleteMany({ weekId });
     await mongo.db.collection('earning_events').insertMany(

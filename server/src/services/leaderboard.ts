@@ -1,7 +1,22 @@
 import type Redis from 'ioredis';
 import type { LeaderboardEntry, PlayerRankView } from '@panteon/shared';
-import { leaderboardKey } from '../lib/keys.js';
+import { leaderboardKey, poolKey } from '../lib/keys.js';
+import { weekWindow } from '../lib/week.js';
 import { attachNames } from './profile.js';
+
+export interface WeekStatus { weekId: string; pool: number; startsAt: string; endsAt: string; }
+
+/** Live week status for the header: prize pool (Redis) + the week window (computed). */
+export async function getWeekStatus(redis: Redis, weekId: string, offsetHours: number): Promise<WeekStatus> {
+  const poolRaw = await redis.get(poolKey(weekId));
+  const { startsAt, endsAt } = weekWindow(weekId, offsetHours);
+  return {
+    weekId,
+    pool: poolRaw ? Math.floor(Number(poolRaw)) : 0,
+    startsAt: startsAt.toISOString(),
+    endsAt: endsAt.toISOString(),
+  };
+}
 
 /** Turn a ZREVRANGE WITHSCORES slice (starting at 0-based rank `start`) into ranked entries. */
 async function rangeToEntries(redis: Redis, weekId: string, start: number, stop: number): Promise<LeaderboardEntry[]> {

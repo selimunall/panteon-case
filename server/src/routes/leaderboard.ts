@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { Config } from '@panteon/shared';
 import type { Env } from '../env.js';
 import { weekIdFor } from '../lib/week.js';
-import { getPage, getPlayerRankView } from '../services/leaderboard.js';
+import { getPage, getPlayerRankView, getWeekStatus } from '../services/leaderboard.js';
 import { getTop100 } from '../services/top100Cache.js';
 
 export interface ReadDeps { redis: Redis; config: Config; env: Env; }
@@ -17,6 +17,10 @@ const pageQuery = z.object({
 
 export function registerLeaderboardRoutes(app: FastifyInstance, deps: ReadDeps): void {
   const week = () => weekIdFor(new Date(), deps.env.WEEK_RESET_OFFSET_HOURS);
+
+  app.get('/leaderboard/status', async () => {
+    return getWeekStatus(deps.redis, week(), deps.env.WEEK_RESET_OFFSET_HOURS);
+  });
 
   app.get('/leaderboard/top', async () => {
     const weekId = week();

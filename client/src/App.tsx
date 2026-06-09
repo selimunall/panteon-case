@@ -1,122 +1,99 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useCallback, useEffect, useState } from 'react';
+import './App.css';
+import { fetchPage } from './api.js';
+import { useMyRank, usePages, useStatus, useTop100 } from './hooks.js';
+import { PrizePoolBanner } from './components/PrizePoolBanner.js';
+import { Countdown } from './components/Countdown.js';
+import { Podium } from './components/Podium.js';
+import { MyRankCard } from './components/MyRankCard.js';
+import { LeaderboardList } from './components/LeaderboardList.js';
 
-function App() {
-  const [count, setCount] = useState(0)
+const ME_KEY = 'panteon.me';
+
+export default function App() {
+  const status = useStatus();
+  const top = useTop100();
+  const pages = usePages();
+
+  const [meId, setMeId] = useState<string | null>(() => localStorage.getItem(ME_KEY));
+  const { view, notRanked } = useMyRank(meId);
+  const [scrollToRank, setScrollToRank] = useState<number | null>(null);
+
+  const pick = useCallback((id: string) => {
+    setMeId(id);
+    localStorage.setItem(ME_KEY, id);
+  }, []);
+
+  const surprise = useCallback(async () => {
+    const cap = pages.cap || 1000;
+    const offset = Math.floor(Math.random() * cap);
+    const r = await fetchPage(offset, 1);
+    if (r.entries[0]) pick(r.entries[0].playerId);
+  }, [pages.cap, pick]);
+
+  // Auto-pick a player on first visit so "your standing" is populated.
+  useEffect(() => {
+    if (!meId) void surprise();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const jumpToMe = useCallback(async () => {
+    const rank = view?.player.rank;
+    if (!rank) return;
+    await pages.loadUntil(rank + 4);
+    setScrollToRank(rank);
+    setTimeout(() => setScrollToRank(null), 600);
+  }, [view, pages]);
+
+  const top3 = (top.data ?? []).slice(0, 3);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="app">
+      <div className="bg-grain" aria-hidden />
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark">▰▰</span>
+          <span className="brand-name">PANTEON</span>
+          <span className="brand-sub">Weekly Arena</span>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
+        <div className="topbar-right">
+          <span className="week-chip">{status.data?.weekId ?? '—'}</span>
+          <button className="btn-surprise" onClick={() => void surprise()}>⚄ Surprise me</button>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+      </header>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+      <section className="hero">
+        <div className="hero-left">
+          <PrizePoolBanner pool={status.data?.pool ?? 0} />
+          <Countdown endsAt={status.data?.endsAt} />
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
+        <div className="hero-right">
+          <MyRankCard view={view} notRanked={notRanked} onJump={() => void jumpToMe()} onPick={pick} />
         </div>
       </section>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <section className="podium-wrap">
+        <div className="section-head"><h2>The Podium</h2><span>Top earners take 20 / 15 / 10%</span></div>
+        {top.loading && top3.length === 0 ? <div className="podium-skeleton" /> : <Podium top3={top3} meId={meId} onSelect={pick} />}
+      </section>
+
+      <section className="board">
+        <div className="section-head"><h2>The Climb</h2><span>Ranks 4 – {pages.cap} · scroll to explore</span></div>
+        <div className="board-cols"><span>#</span><span>Player</span><span>Earned</span></div>
+        <LeaderboardList
+          entries={pages.entries}
+          meId={meId}
+          onSelect={pick}
+          hasMore={pages.hasMore}
+          onLoadMore={pages.loadMore}
+          scrollToRank={scrollToRank}
+        />
+      </section>
+
+      <footer className="footer">
+        <span>Live · refreshes every 3s</span>
+        <span>Redis · Postgres · MongoDB</span>
+      </footer>
+    </div>
+  );
 }
-
-export default App

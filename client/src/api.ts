@@ -10,7 +10,9 @@ async function get<T>(path: string): Promise<T> {
 
 export interface TopResponse { weekId: string; entries: LeaderboardEntry[]; }
 export interface PageResponse { weekId: string; offset: number; cap: number; entries: LeaderboardEntry[]; }
+export interface WeekStatus { weekId: string; pool: number; startsAt: string; endsAt: string; }
 
+export const fetchStatus = () => get<WeekStatus>('/leaderboard/status');
 export const fetchTop = () => get<TopResponse>('/leaderboard/top');
 export const fetchPage = (offset: number, limit = 50) => get<PageResponse>(`/leaderboard/page?offset=${offset}&limit=${limit}`);
 

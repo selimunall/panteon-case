@@ -7,6 +7,10 @@ const EnvSchema = z.object({
   MONGO_DB: z.string().min(1),
   PORT: z.coerce.number().int().default(3000),
   WEEK_RESET_OFFSET_HOURS: z.coerce.number().default(0),
+  MAX_DELTA_PER_INTERVAL: z.coerce.number().int().default(1_000_000),
+  IDEMP_TTL_SEC: z.coerce.number().int().default(604800), // 7 days
+  RATE_LIMIT_MAX: z.coerce.number().int().default(10),
+  RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().default(10),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

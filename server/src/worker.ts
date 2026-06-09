@@ -4,9 +4,11 @@ import { createPg } from './db/pg.js';
 import { createRedis } from './db/redis.js';
 import { createMongo } from './db/mongo.js';
 import { weekIdFor } from './lib/week.js';
+import { loadConfig } from './config.js';
 import { ensureEventIndexes } from './services/mongoEvents.js';
 import { ensureWeekRow } from './services/persistScores.js';
 import { ensureGroup, processBatch, reclaimStale } from './services/streamConsumer.js';
+import { startTop100Refresher } from './services/top100Cache.js';
 
 async function main(): Promise<void> {
   const env = loadEnv();
@@ -18,9 +20,17 @@ async function main(): Promise<void> {
   await ensureEventIndexes(mongo);
   const deps = { redis, mongo, pg };
 
+  const config = loadConfig(env);
+  const stopRefresher = startTop100Refresher(
+    redis,
+    () => weekIdFor(new Date(), env.WEEK_RESET_OFFSET_HOURS),
+    { refreshMs: config.cache.top100RefreshMs, ttlMs: config.cache.top100TtlMs },
+  );
+
   let running = true;
   const shutdown = async () => {
     running = false;
+    stopRefresher();
     await Promise.allSettled([redis.quit(), mongoClient.close(), pool.end()]);
     process.exit(0);
   };

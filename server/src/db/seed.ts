@@ -6,6 +6,7 @@ import { players, weeks, weeklyScores } from './schema.js';
 import { createRedis } from './redis.js';
 import { createMongo } from './mongo.js';
 import { weekIdFor, weekWindow } from '../lib/week.js';
+import { ensureEventIndexes } from '../services/mongoEvents.js';
 
 export interface SeedOptions {
   pgUrl: string; redisUrl: string; mongoUrl: string; mongoDb: string;
@@ -49,10 +50,20 @@ export async function runSeed(opts: SeedOptions): Promise<{ weekId: string; coun
     await db.insert(weeklyScores).values(scoreRows).onConflictDoNothing();
     await redis.zadd(zKey, ...zArgs);
 
-    await mongo.db.collection('earning_events').insertOne({
-      weekId, playerId: playerRows[0]!.id, delta: 1000, idempKey: randomUUID(),
-      clientTs: now, ingestedAt: now, streamId: 'seed-0',
-    });
+    await ensureEventIndexes(mongo.db);
+    await mongo.db.collection('earning_events').deleteMany({ weekId });
+    await mongo.db.collection('earning_events').insertMany(
+      scoreRows.map((s, i) => ({
+        weekId,
+        playerId: s.playerId,
+        delta: Number(s.totalEarned),
+        idempKey: randomUUID(),
+        clientTs: now,
+        ingestedAt: now,
+        streamId: `seed-${i}`,
+      })),
+      { ordered: false },
+    );
 
     return { weekId, count };
   } finally {

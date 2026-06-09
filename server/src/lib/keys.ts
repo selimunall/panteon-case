@@ -5,3 +5,4 @@ export const streamKey = (weekId: string): string => `stream:earnings:week:${wee
 export const idempRedisKey = (idempKey: string): string => `idemp:${idempKey}`;
 export const rateLimitKey = (playerId: string): string => `rl:${playerId}`;
 export const top100CacheKey = (weekId: string): string => `cache:leaderboard:week:${weekId}:top100`;
+export const profileKey = (playerId: string): string => `profile:${playerId}`;

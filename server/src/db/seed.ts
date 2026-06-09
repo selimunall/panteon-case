@@ -50,6 +50,9 @@ export async function runSeed(opts: SeedOptions): Promise<{ weekId: string; coun
     await db.insert(weeklyScores).values(scoreRows).onConflictDoNothing();
     await redis.zadd(zKey, ...zArgs);
 
+    const { setProfiles } = await import('../services/profile.js');
+    await setProfiles(redis, playerRows);
+
     await ensureEventIndexes(mongo.db);
     await mongo.db.collection('earning_events').deleteMany({ weekId });
     await mongo.db.collection('earning_events').insertMany(

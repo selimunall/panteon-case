@@ -1,6 +1,7 @@
 import type Redis from 'ioredis';
 import type { LeaderboardEntry, PlayerRankView } from '@panteon/shared';
 import { leaderboardKey } from '../lib/keys.js';
+import { attachNames } from './profile.js';
 
 /** Turn a ZREVRANGE WITHSCORES slice (starting at 0-based rank `start`) into ranked entries. */
 async function rangeToEntries(redis: Redis, weekId: string, start: number, stop: number): Promise<LeaderboardEntry[]> {
@@ -13,17 +14,17 @@ async function rangeToEntries(redis: Redis, weekId: string, start: number, stop:
   return out;
 }
 
-/** Top 100 (rank 1..100). */
-export function computeTop100(redis: Redis, weekId: string): Promise<LeaderboardEntry[]> {
-  return rangeToEntries(redis, weekId, 0, 99);
+/** Top 100 (rank 1..100), decorated with display names. */
+export async function computeTop100(redis: Redis, weekId: string): Promise<LeaderboardEntry[]> {
+  return attachNames(redis, await rangeToEntries(redis, weekId, 0, 99));
 }
 
-/** A page of the ranking, clamped to [0, cap). */
-export function getPage(redis: Redis, weekId: string, offset: number, limit: number, cap = 1000): Promise<LeaderboardEntry[]> {
+/** A page of the ranking, clamped to [0, cap), decorated with display names. */
+export async function getPage(redis: Redis, weekId: string, offset: number, limit: number, cap = 1000): Promise<LeaderboardEntry[]> {
   const start = Math.max(0, offset);
-  if (start >= cap) return Promise.resolve([]);
+  if (start >= cap) return [];
   const stop = Math.min(start + limit - 1, cap - 1);
-  return rangeToEntries(redis, weekId, start, stop);
+  return attachNames(redis, await rangeToEntries(redis, weekId, start, stop));
 }
 
 /** A player's own rank plus 3 above / 2 below (the window is only filled outside the top 100). */
@@ -41,5 +42,6 @@ export async function getPlayerRankView(redis: Redis, weekId: string, playerId: 
     const window = await rangeToEntries(redis, weekId, Math.max(0, rank0 - 3), rank0 + 2);
     neighbours = window.filter((e) => e.playerId !== playerId);
   }
-  return { weekId, inTop100, player, neighbours };
+  const decorated = await attachNames(redis, [player, ...neighbours]);
+  return { weekId, inTop100, player: decorated[0]!, neighbours: decorated.slice(1) };
 }

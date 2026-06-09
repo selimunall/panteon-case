@@ -40,6 +40,14 @@ async function handleBatch(deps: Deps, weekId: string, entries: Array<[string, s
   const freshKeys = await insertRawEvents(deps.mongo, weekId, events); // Mongo first (gate)
   const freshEvents = events.filter((e) => freshKeys.has(e.idempKey));
   await persistScores(deps.pg, weekId, freshEvents);                   // Postgres for new only
+
+  // Best-effort stub display name for unseen players (NX never overwrites a real name).
+  if (freshEvents.length > 0) {
+    const pipe = deps.redis.pipeline();
+    for (const e of freshEvents) pipe.set(`profile:${e.playerId}`, `player-${e.playerId.slice(0, 8)}`, 'NX');
+    await pipe.exec();
+  }
+
   await deps.redis.xack(streamKey(weekId), GROUP, ...entries.map(([id]) => id));
   return entries.length;
 }

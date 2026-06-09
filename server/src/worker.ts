@@ -9,6 +9,7 @@ import { ensureEventIndexes } from './services/mongoEvents.js';
 import { ensureWeekRow } from './services/persistScores.js';
 import { ensureGroup, processBatch, reclaimStale } from './services/streamConsumer.js';
 import { startTop100Refresher } from './services/top100Cache.js';
+import { startCloseScheduler } from './scheduler.js';
 
 async function main(): Promise<void> {
   const env = loadEnv();
@@ -26,11 +27,13 @@ async function main(): Promise<void> {
     () => weekIdFor(new Date(), env.WEEK_RESET_OFFSET_HOURS),
     { refreshMs: config.cache.top100RefreshMs, ttlMs: config.cache.top100TtlMs },
   );
+  const stopScheduler = startCloseScheduler(deps, env.WEEK_RESET_OFFSET_HOURS, config);
 
   let running = true;
   const shutdown = async () => {
     running = false;
     stopRefresher();
+    stopScheduler();
     await Promise.allSettled([redis.quit(), mongoClient.close(), pool.end()]);
     process.exit(0);
   };

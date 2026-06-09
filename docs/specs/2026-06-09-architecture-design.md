@@ -68,7 +68,7 @@ The synchronous part of the request runs a **single atomic Lua script** in one r
 ```
 1. idempotency check  (SET NX on the batch key; if exists -> no-op, return)
 2. ZINCRBY  leaderboard:week:{weekId}  delta  playerId      # ranking
-3. INCRBYFLOAT  pool:week:{weekId}  (delta * 0.02)          # running prize pool
+3. INCRBYFLOAT  pool:week:{weekId}  (delta * poolRate)      # running prize pool (poolRate from config, default 0.02)
 4. XADD  stream:earnings:week:{weekId}  ...                 # enqueue for durability
 ```
 
@@ -80,10 +80,12 @@ Everything the user must see immediately ends here. Postgres and Mongo are **not
 
 A **Background process** runs a Redis **Streams consumer group** over `stream:earnings:week:{weekId}`:
 
-- Drains the stream, and within a short window (~500ms) **merges events per player**, so the same player's N events collapse into a single upsert. ~100k events/s reduces to far fewer DB operations.
-- **Bulk inserts** raw events into Mongo `earning_events`.
-- **Batch upserts** verified totals into Postgres `weekly_scores` and accumulates the authoritative pool.
-- **Acks** each message; at-least-once delivery, replayable.
+- Drains the stream in batches.
+- **Inserts raw events into Mongo `earning_events` first — idempotently.** Each event carries its batch `idempKey`; the **unique index on `idempKey`** rejects a redelivered event as a duplicate instead of inserting it twice. This insert is the worker's **idempotency gate**.
+- **Accumulates only the newly-inserted events.** Within a short window (~500ms) the worker **merges the just-inserted events per player**, so the same player's N events collapse into one upsert that adds the summed delta to `weekly_scores.total_earned` **and** to `weeks.total_earned`. ~100k events/s reduces to far fewer DB operations. The pool is **not** accumulated here — it is derived once at close as `floor(total_earned × rate)` (§5.2.4), so no float rounding drift can build up.
+- **Acks** each message.
+
+**Why this is idempotent under at-least-once delivery:** a message can be redelivered if the worker crashes after writing but before `XACK`. The Redis Lua dedupe (§3.2) only stops a *client* from enqueuing the same batch twice; it does **not** prevent the consumer group from **redelivering** an already-enqueued entry. The unique `idempKey` index is therefore load-bearing, not decorative: because the Postgres accumulation is gated on the newly-inserted set, a redelivered message contributes nothing and money is never double-counted. Replay is safe.
 
 **Why Redis Streams specifically:** the stack is fixed — no Kafka/RabbitMQ/SQS. The only stack-native durable queue is Redis Streams. Consumer group + ack gives at-least-once and replay, and is strictly better than list/pub-sub here. This is **not a preference, it is the natural consequence of the constraint** — and is justified as such.
 
@@ -137,13 +139,13 @@ The ZSET key is `leaderboard:week:{weekId}` where `weekId` is **derived from the
 
 Triggered by a **timer in the Background process**, guarded by a **leader lock** (Redis lock / Postgres advisory lock) so that with N background replicas, **exactly one** runs the close. Steps:
 
-1. **Freeze:** the previous `weekId` key already stopped receiving writes once the clock passed the boundary.
+1. **Freeze + mark closing:** the previous `weekId` key already stopped receiving writes once the clock passed the boundary; set that week's `weeks.status = 'closing'`.
 2. **Barrier — wait for the pipeline to fully drain.** Wait until that week's `stream:earnings:week:{weekId}` is **empty and fully acked**, so every earn has landed in Postgres. **Without this barrier the pool and totals would still be behind Redis and distribution would pay out with incomplete money.**
 3. **Derive ranking from Postgres, not from the frozen ZSET:** `SELECT ... FROM weekly_scores WHERE week_id = ? ORDER BY total_earned DESC LIMIT 100` (indexed, cheap). The Redis ranking exists only for live UX; because money depends on rank, deriving the payout ranking from Postgres's authoritative totals eliminates the "Redis says X, Postgres says Y" edge case entirely.
 4. **Compute pool** from Postgres's authoritative weekly total (money = source of truth, not the Redis counter).
 5. **Distribute** (see 5.3), writing `reward_payouts` inside a **single transaction**.
-6. **Archive** the final board to Mongo `leaderboard_snapshots`.
-7. **Roll the remainder** into next week's pool and **clean up** the old Redis key.
+6. **Archive** the final board to Mongo `leaderboard_snapshots` — the top-1000 `entries` (a second `ORDER BY total_earned DESC LIMIT 1000` from `weekly_scores`, matching the scroll cap §4.2) plus the top-100 `payouts`.
+7. **Roll the remainder** into next week's pool, **clean up** the old Redis key, and set `weeks.status = 'closed'` (with `closed_at`).
 
 **Idempotency:** keyed by `weekId`. If the job runs twice, the existing payout record for that week makes the second run a no-op — no double payout.
 

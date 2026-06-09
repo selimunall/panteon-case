@@ -43,7 +43,7 @@ export const players = pgTable('players', {
 
 /**
  * weeks — one row per weekly cycle. `week_id` is the time-derived ISO week
- * (e.g. "2026-W23"), used verbatim in every Redis key.
+ * (e.g. "2026-W24" — the week of Mon 2026-06-08), used verbatim in every Redis key.
  * Auditable invariant after close: pool_total = floor(total_earned * poolRate) + rollover_in,
  * and sum(reward_payouts.amount) + rollover_out = pool_total.
  */
@@ -118,7 +118,7 @@ archived to Mongo.
 | `pool:week:{weekId}` | String (float) | **live, lossy** running pool for the UI, accumulated via `INCRBYFLOAT (delta * poolRate)`; the authoritative integer pool is computed at close from Postgres | none — deleted by close job |
 | `stream:earnings:week:{weekId}` | Stream | entries `{ playerId, delta, idempKey, clientTs }`, consumed by the worker group | none — trimmed/deleted by close job after drain |
 | `idemp:{idempKey}` | String | `"1"` marker, written `SET NX` in the hot-path Lua to dedupe a batch | **7 days** (configurable) — must outlive offline re-send within a week |
-| `rl:{playerId}` | String (counter) | rate-limit count for the current window (`INCR` + `EXPIRE`) | = rate-limit window (~10s, ≈ batch interval) |
+| `rl:{playerId}` | String (counter) | rate-limit count for the current window (`INCR` + `EXPIRE`) | = rate-limit window (~10s ≈ 2× the 5s batch interval, leaving headroom for retries) |
 | `cache:leaderboard:week:{weekId}:top100` | String | serialized JSON array of the top-100 `LeaderboardEntry[]`, rewritten ~1s by the background refresher | **~2s** safety TTL (refresher keeps it warm → no stampede) |
 
 Notes:
@@ -131,6 +131,10 @@ Notes:
   `leaderboard:week:{weekId}`; it is **not** cached.
 - A Redis consumer group (e.g. `cg:persist`) is created on `stream:earnings:week:{weekId}`;
   the group name is operational config, not stored data.
+- Sorted-set scores are IEEE-754 doubles (53-bit integer precision). Per-player weekly totals
+  stay well within 2^53 for an idle game, so live ranking is exact in practice; should a total
+  ever exceed 2^53 the live score loses low-order precision, but the **payout ranking is derived
+  from Postgres `bigint` at close** (architecture §5.2.3), so money is never affected.
 
 ---
 
@@ -144,28 +148,32 @@ verified totals live in Postgres (architecture §2). All currency values are int
 ```jsonc
 {
   "_id": "ObjectId",
-  "weekId": "2026-W23",
+  "weekId": "2026-W24",                                 // Mon 2026-06-08 is in ISO week 24
   "playerId": "0f8a1c4e-3b2d-4e5f-9a10-7c6b5d4e3f21",  // uuid, matches players.id
   "delta": 1500,                // integer currency in this batch
   "idempKey": "b1f2...uuid",    // batch idempotency key
-  "clientTs": "2026-06-08T21:14:03.000Z",
+  "clientTs": "2026-06-08T21:14:03.000Z",    // BSON Date; worker converts EarnPayload.clientTs (epoch ms) on persist
   "ingestedAt": "2026-06-08T21:14:03.480Z",  // when the worker persisted it
-  "streamId": "1717880043480-0"              // source Redis stream id (replay/trace)
+  "streamId": "1780953243480-0"              // source Redis stream id (replay/trace)
 }
 ```
 
 Indexes: `{ weekId: 1, playerId: 1 }` (per-player history / reconcile) and a **unique** index
-on `{ idempKey: 1 }` (defence-in-depth dedupe; primary dedupe is Redis Lua).
+on `{ idempKey: 1 }`. This unique index is the durability worker's **idempotency gate**: the
+Redis Lua dedupe stops a *client* from enqueuing a batch twice, but consumer-group
+**redelivery** can replay an already-enqueued entry, so only events newly inserted here (not
+rejected as duplicates) are accumulated into Postgres — preventing double-counted money
+(architecture §3.3).
 
 ### `leaderboard_snapshots` — one document per closed week (archive)
 
 ```jsonc
 {
   "_id": "ObjectId",
-  "weekId": "2026-W23",
-  "closedAt": "2026-06-09T00:00:12.000Z",
+  "weekId": "2026-W23",         // the prior, now-closed week (W24 is the active one above)
+  "closedAt": "2026-06-08T00:00:12.000Z",   // closed just after the W23→W24 boundary (Mon 00:00 UTC)
   "poolTotal": 4820350,         // integer, = floor(totalEarned * rate) + rolloverIn
-  "totalEarned": 240517500,     // integer
+  "totalEarned": 241017500,     // integer (floor(241017500 * 0.02) = 4820350)
   "rolloverIn": 0,              // integer remainder carried in
   "rolloverOut": 41,            // integer remainder carried to next week
   "entries": [                  // final ranking, top 1000 (explorable range)
@@ -220,28 +228,31 @@ export interface PlayerRankView {
 /** Runtime configuration (single source for all tunables in the architecture). */
 export const Config = z.object({
   week: z.object({
-    timezone: z.literal('UTC'),
+    timezone: z.literal('UTC').default('UTC'),
     resetOffsetHours: z.number().default(0),   // offset from UTC Monday 00:00
-  }),
+  }).default({}),
   pool: z.object({
     rate: z.number().default(0.02),            // 2% of earnings
     top3: z.tuple([z.number(), z.number(), z.number()]).default([0.20, 0.15, 0.10]),
     bandShare: z.number().default(0.55),       // ranks 4..100
     curveExponent: z.number().default(1),      // k in (101 - rank)^k
-  }),
+  }).default({}),
   scroll: z.object({
     cap: z.number().int().default(1000),       // deepest explorable rank
     pageSize: z.number().int().default(50),
-  }),
+  }).default({}),
   batch: z.object({
     intervalMs: z.number().int().default(5000),
-    maxDeltaPerInterval: z.number().int(),     // server-side anti-cheat clamp
+    maxDeltaPerInterval: z.number().int(),     // server-side anti-cheat clamp (required)
   }),
   cache: z.object({
     top100RefreshMs: z.number().int().default(1000),
     top100TtlMs: z.number().int().default(2000),
-  }),
-});
+  }).default({}),
+}).refine(
+  (c) => Math.abs(c.pool.top3[0] + c.pool.top3[1] + c.pool.top3[2] + c.pool.bandShare - 1) < 1e-9,
+  { message: 'pool.top3 + pool.bandShare must sum to 1 (the whole pool must be distributed)' },
+);
 export type Config = z.infer<typeof Config>;
 ```
 
@@ -266,5 +277,5 @@ export type Config = z.infer<typeof Config>;
 - **`leaderboard_snapshots` stores top 1000 entries + top 100 payouts** — top 1000 matches the
   explorable scroll cap; the paid set is the top 100.
 - **`idemp:*` TTL = 7 days** (configurable), chosen to outlive any plausible offline re-send
-  window within a single week; **`rl:*` TTL ≈ batch interval**.
+  window within a single week; **`rl:*` TTL ≈ 2× batch interval** (~10s).
 - **`top100` cache TTL ≈ 2s** with a ~1s background refresher (stampede-free per architecture §4.1).

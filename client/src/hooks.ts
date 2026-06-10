@@ -100,6 +100,28 @@ export function usePages(): {
 
   useEffect(() => { void loadNext(); }, [loadNext]);
 
+  // Keep the already-loaded ranks live (overwrite by rank) so the list stays in sync
+  // with the personal card / podium instead of showing a stale snapshot.
+  const refresh = useCallback(async (): Promise<void> => {
+    const max = offsetRef.current;
+    if (max === 0) return;
+    const offs: number[] = [];
+    for (let o = 0; o < max; o += PAGE) offs.push(o);
+    const results = await Promise.all(offs.map((o) => fetchPage(o, PAGE).catch(() => null)));
+    const fresh = results.flatMap((r) => r?.entries ?? []);
+    if (fresh.length === 0) return;
+    setEntries((prev) => {
+      const map = new Map(prev.map((e) => [e.rank, e]));
+      for (const e of fresh) map.set(e.rank, e);
+      return [...map.values()].sort((a, b) => a.rank - b.rank);
+    });
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => void refresh(), 3000);
+    return () => clearInterval(t);
+  }, [refresh]);
+
   const loadUntil = useCallback(async (rank: number): Promise<void> => {
     let guard = 0;
     while (offsetRef.current < rank && hasMoreRef.current && guard++ < 40) {

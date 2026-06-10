@@ -42,25 +42,23 @@ export function useTop100(): PollState<LeaderboardEntry[]> {
   return { data: data?.entries ?? null, loading, error };
 }
 
-export function useMyRank(playerId: string | null): { view: PlayerRankView | null; notRanked: boolean } {
+export function useMyRank(playerId: string | null): { view: PlayerRankView | null; notRanked: boolean; refresh: () => void } {
   const [view, setView] = useState<PlayerRankView | null>(null);
   const [notRanked, setNotRanked] = useState(false);
-  useEffect(() => {
+  const run = useCallback(async () => {
     if (!playerId) { setView(null); setNotRanked(false); return; }
-    let alive = true;
-    const run = async () => {
-      try {
-        const v = await fetchMe(playerId);
-        if (!alive) return;
-        setView(v);
-        setNotRanked(v === null);
-      } catch { /* keep last */ }
-    };
-    run();
-    const t = setInterval(run, 3000);
-    return () => { alive = false; clearInterval(t); };
+    try {
+      const v = await fetchMe(playerId);
+      setView(v);
+      setNotRanked(v === null);
+    } catch { /* keep last */ }
   }, [playerId]);
-  return { view, notRanked };
+  useEffect(() => {
+    void run();
+    const t = setInterval(() => void run(), 3000);
+    return () => clearInterval(t);
+  }, [run]);
+  return { view, notRanked, refresh: () => void run() };
 }
 
 const PAGE = 50;

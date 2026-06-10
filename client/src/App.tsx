@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import './App.css';
-import { fetchPage } from './api.js';
+import { fetchPage, postEarn } from './api.js';
 import { useMyRank, usePages, useStatus, useTop100 } from './hooks.js';
 import { PrizePoolBanner } from './components/PrizePoolBanner.js';
 import { Countdown } from './components/Countdown.js';
@@ -16,8 +16,9 @@ export default function App() {
   const pages = usePages();
 
   const [meId, setMeId] = useState<string | null>(() => localStorage.getItem(ME_KEY));
-  const { view, notRanked } = useMyRank(meId);
+  const { view, notRanked, refresh } = useMyRank(meId);
   const [scrollToRank, setScrollToRank] = useState<number | null>(null);
+  const [earning, setEarning] = useState(false);
 
   const pick = useCallback((id: string) => {
     setMeId(id);
@@ -36,6 +37,18 @@ export default function App() {
     if (!meId) void surprise();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const earn = useCallback(async () => {
+    if (!meId || !status.data) return;
+    setEarning(true);
+    const amount = 20000 + Math.floor(Math.random() * 40000);
+    try {
+      await postEarn(meId, amount, status.data.weekId);
+      refresh(); // immediate feedback; polling keeps the rest fresh
+    } finally {
+      setTimeout(() => setEarning(false), 220);
+    }
+  }, [meId, status.data, refresh]);
 
   const jumpToMe = useCallback(async () => {
     const rank = view?.player.rank;
@@ -58,6 +71,13 @@ export default function App() {
         </div>
         <div className="topbar-right">
           <span className="week-chip">{status.data?.weekId ?? '—'}</span>
+          <button
+            className={`btn-earn${earning ? ' is-earning' : ''}`}
+            onClick={() => void earn()}
+            disabled={!meId || !status.data}
+          >
+            <span className="earn-bolt">⚡</span> Earn
+          </button>
           <button className="btn-surprise" onClick={() => void surprise()}>⚄ Surprise me</button>
         </div>
       </header>

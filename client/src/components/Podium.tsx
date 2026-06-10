@@ -5,8 +5,10 @@ import { formatCompact } from '../lib/format.js';
 const ORDER = [1, 0, 2]; // silver, gold, bronze — gold centered
 const TIER = ['gold', 'silver', 'bronze'] as const;
 
+type PodiumEntry = LeaderboardEntry & { reward?: number };
+
 export function Podium({ top3, meId, onSelect }: {
-  top3: LeaderboardEntry[];
+  top3: PodiumEntry[];
   meId: string | null;
   onSelect: (id: string) => void;
 }) {
@@ -27,6 +29,7 @@ export function Podium({ top3, meId, onSelect }: {
             <Avatar playerId={e.playerId} name={e.displayName} size={idx === 0 ? 76 : 60} />
             <span className="podium-name">{e.displayName ?? e.playerId.slice(0, 8)}</span>
             <span className="podium-score">{formatCompact(e.totalEarned)}</span>
+            {e.reward != null && e.reward > 0 && <span className="podium-reward">won ◈ {formatCompact(e.reward)}</span>}
             <span className="podium-pedestal">
               <span className="podium-rank">{e.rank}</span>
             </span>

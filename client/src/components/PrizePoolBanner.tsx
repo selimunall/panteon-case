@@ -23,16 +23,16 @@ function useCountUp(target: number, ms = 900): number {
   return value;
 }
 
-export function PrizePoolBanner({ pool }: { pool: number }) {
+export function PrizePoolBanner({ pool, closed }: { pool: number; closed?: boolean }) {
   const value = useCountUp(pool);
   return (
     <div className="pool">
-      <span className="pool-eyebrow">Weekly prize pool</span>
+      <span className="pool-eyebrow">{closed ? 'Distributed prize pool' : 'Weekly prize pool'}</span>
       <div className="pool-figure">
         <span className="pool-coin">◈</span>
         <span className="pool-amount">{formatNumber(value)}</span>
       </div>
-      <span className="pool-note">2% of everything earned this week · top 100 share it</span>
+      <span className="pool-note">{closed ? 'Shared among the top 100 — week closed' : '2% of everything earned this week · top 100 share it'}</span>
     </div>
   );
 }

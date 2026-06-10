@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type UIEvent } from 'react';
-import type { LeaderboardEntry } from '@panteon/shared';
-import { RankRow } from './RankRow.js';
+import { RankRow, type RowEntry } from './RankRow.js';
 
 const ROW = 56;        // px per row
 const OVERSCAN = 6;
@@ -8,7 +7,7 @@ const START_RANK = 4;  // ranks 1–3 live on the podium
 
 /** Windowed, infinite-scroll list: only the visible rows are in the DOM (fixes the legacy freeze). */
 export function LeaderboardList({ entries, meId, onSelect, hasMore, onLoadMore, scrollToRank }: {
-  entries: LeaderboardEntry[];
+  entries: RowEntry[];
   meId: string | null;
   onSelect: (id: string) => void;
   hasMore: boolean;

@@ -51,6 +51,28 @@
   100% { background: rgba(246, 196, 83, 0.1); box-shadow: 0 0 0 0 rgba(246, 196, 83, 0); }
 }
 
+/* ---------- week tabs ---------- */
+.tabs { display: flex; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; }
+.tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px;
+  background: var(--surface); transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.tab:hover { color: var(--text); border-color: var(--line-strong); }
+.tab.is-active { color: var(--text); border-color: rgba(198, 255, 79, 0.5); background: rgba(198, 255, 79, 0.08); }
+.tab-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 8px var(--lime); animation: pulse 1.6s infinite; }
+.tab-week, .tab-pool { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+.tab.is-active .tab-pool { color: var(--gold); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ---------- closed badge ---------- */
+.closed-badge {
+  border: 1px solid rgba(246, 196, 83, 0.3); border-radius: var(--radius); padding: 18px 22px;
+  background: rgba(246, 196, 83, 0.05); display: flex; flex-direction: column; gap: 4px;
+}
+.closed-when { font-family: var(--mono); font-size: 15px; color: var(--gold); }
+
 /* ---------- hero ---------- */
 .hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 18px; margin-bottom: 28px; }
 .hero-left { display: flex; flex-direction: column; gap: 16px; }
@@ -143,7 +165,17 @@
 .tier-bronze .podium-pedestal { height: 84px; background: linear-gradient(180deg, rgba(216, 145, 90, 0.16), rgba(216, 145, 90, 0.02)); border-color: rgba(216, 145, 90, 0.3); }
 .tier-bronze .podium-rank { color: var(--bronze); }
 .podium-slot.is-me .podium-name::after { content: ' ·YOU'; color: var(--lime); font-family: var(--mono); font-size: 11px; }
+.podium-reward { font-family: var(--mono); font-size: 12px; color: var(--gold); margin-top: 2px; }
 .podium-skeleton { height: 220px; border-radius: 16px; background: linear-gradient(100deg, var(--surface), var(--surface-2), var(--surface)); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+
+/* ---------- history extras ---------- */
+.row-reward { font-family: var(--mono); font-size: 11px; color: var(--gold); margin-left: 8px; border: 1px solid rgba(246, 196, 83, 0.35); border-radius: 6px; padding: 1px 6px; }
+.me-card.is-winner { border-color: rgba(246, 196, 83, 0.45); background: radial-gradient(360px 180px at 100% 0, rgba(246, 196, 83, 0.16), transparent 70%), linear-gradient(180deg, var(--surface-2), var(--surface)); }
+.me-rankbadge.hist { flex-direction: column; align-items: flex-start; color: var(--text); margin-right: 4px; }
+.me-reward { margin-top: auto; padding-top: 14px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.me-reward-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.me-reward-amount { font-family: var(--mono); font-weight: 700; font-size: 26px; color: var(--gold); }
+.me-reward-tag { font-size: 12px; color: var(--gold); }
 
 /* ---------- section heads ---------- */
 .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }

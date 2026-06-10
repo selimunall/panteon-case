@@ -12,8 +12,16 @@ export interface TopResponse { weekId: string; entries: LeaderboardEntry[]; }
 export interface PageResponse { weekId: string; offset: number; cap: number; entries: LeaderboardEntry[]; }
 export interface WeekStatus { weekId: string; pool: number; startsAt: string; endsAt: string; }
 
+export interface ArchiveWeek { weekId: string; poolTotal: number; totalEarned: number; closedAt: string | null; }
+export interface Champion { rank: number; playerId: string; displayName?: string; totalEarned: number; reward: number; }
+export interface SnapshotView { weekId: string; closedAt: string | null; poolTotal: number; totalEarned: number; champions: Champion[]; }
+export interface MyHistory { weekId: string; played: boolean; rank: number | null; totalEarned: number; reward: number; }
+
 export const fetchStatus = () => get<WeekStatus>('/leaderboard/status');
 export const fetchTop = () => get<TopResponse>('/leaderboard/top');
+export const fetchArchive = () => get<{ weeks: ArchiveWeek[] }>('/history/weeks');
+export const fetchSnapshot = (weekId: string) => get<SnapshotView>(`/history/${weekId}`);
+export const fetchMyHistory = (weekId: string, playerId: string) => get<MyHistory>(`/history/${weekId}/me?playerId=${playerId}`);
 export const fetchPage = (offset: number, limit = 50) => get<PageResponse>(`/leaderboard/page?offset=${offset}&limit=${limit}`);
 
 /** Earn for a player (manual "play" action). Returns true if applied. */

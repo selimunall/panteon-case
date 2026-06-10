@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LeaderboardEntry, PlayerRankView } from '@panteon/shared';
-import { fetchMe, fetchPage, fetchStatus, fetchTop, type WeekStatus } from './api.js';
+import {
+  fetchArchive, fetchMe, fetchMyHistory, fetchPage, fetchSnapshot, fetchStatus, fetchTop,
+  type ArchiveWeek, type MyHistory, type SnapshotView, type WeekStatus,
+} from './api.js';
 
 /** Ticks every second; returns ms remaining until `endsAt`. */
 export function useCountdown(endsAt: string | undefined): number {
@@ -59,6 +62,31 @@ export function useMyRank(playerId: string | null): { view: PlayerRankView | nul
     return () => clearInterval(t);
   }, [run]);
   return { view, notRanked, refresh: () => void run() };
+}
+
+export function useArchive(): ArchiveWeek[] {
+  const [weeks, setWeeks] = useState<ArchiveWeek[]>([]);
+  useEffect(() => { fetchArchive().then((r) => setWeeks(r.weeks)).catch(() => {}); }, []);
+  return weeks;
+}
+
+export function useSnapshot(weekId: string | null): SnapshotView | null {
+  const [snap, setSnap] = useState<SnapshotView | null>(null);
+  useEffect(() => {
+    if (!weekId) { setSnap(null); return; }
+    setSnap(null);
+    fetchSnapshot(weekId).then(setSnap).catch(() => setSnap(null));
+  }, [weekId]);
+  return snap;
+}
+
+export function useMyHistory(weekId: string | null, playerId: string | null): MyHistory | null {
+  const [me, setMe] = useState<MyHistory | null>(null);
+  useEffect(() => {
+    if (!weekId || !playerId) { setMe(null); return; }
+    fetchMyHistory(weekId, playerId).then(setMe).catch(() => setMe(null));
+  }, [weekId, playerId]);
+  return me;
 }
 
 const PAGE = 50;

@@ -79,7 +79,7 @@ export default function App() {
 
       <section className="board">
         <div className="section-head"><h2>The Climb</h2><span>Ranks 4 – {pages.cap} · scroll to explore</span></div>
-        <div className="board-cols"><span>#</span><span>Player</span><span>Earned</span></div>
+        <div className="board-cols"><span>#</span><span /><span>Player</span><span>Earned</span></div>
         <LeaderboardList
           entries={pages.entries}
           meId={meId}

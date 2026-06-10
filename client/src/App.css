@@ -132,7 +132,7 @@
 
 /* ---------- board / list ---------- */
 .board { border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; background: linear-gradient(180deg, var(--surface), rgba(22,20,29,0.6)); box-shadow: var(--shadow); }
-.board-cols { display: grid; grid-template-columns: 70px 1fr 140px; padding: 0 14px 8px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); border-bottom: 1px solid var(--line); }
+.board-cols { display: grid; grid-template-columns: 72px 46px 1fr 140px; gap: 12px; padding: 0 14px 8px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); border-bottom: 1px solid var(--line); }
 .board-cols span:last-child { text-align: right; }
 
 .list { position: relative; height: 60vh; min-height: 420px; overflow-y: auto; margin-top: 6px; }
@@ -140,13 +140,13 @@
 .list-loading { position: absolute; left: 0; right: 0; height: 40px; display: grid; place-items: center; font-family: var(--mono); font-size: 12px; color: var(--faint); }
 
 .row {
-  display: grid; grid-template-columns: 70px 34px 1fr 140px; align-items: center; gap: 12px;
+  display: grid; grid-template-columns: 72px 46px 1fr 140px; align-items: center; gap: 12px;
   padding: 0 14px; text-align: left; border-radius: 12px; width: 100%;
   transition: background 0.12s ease;
 }
 .row:hover { background: rgba(255, 255, 255, 0.035); }
-.row-rank { font-size: 14px; color: var(--gold); width: 0; opacity: 0; }   /* star only for medals */
-.row.tier-gold .row-rank, .row.tier-silver .row-rank, .row.tier-bronze .row-rank { width: auto; opacity: 1; }
+.row-rank-cell { display: flex; align-items: center; gap: 6px; }
+.row-medal { font-size: 13px; color: var(--gold); }
 .row-rankn { font-family: var(--mono); font-size: 14px; color: var(--muted); }
 .row.tier-gold .row-rankn { color: var(--gold); }
 .row.tier-silver .row-rankn { color: var(--silver); }
@@ -183,8 +183,8 @@
   .brand-sub { display: none; }
   .podium { gap: 8px; }
   .podium-name { font-size: 13px; }
-  .board-cols { grid-template-columns: 54px 1fr 92px; }
-  .row { grid-template-columns: 54px 30px 1fr 92px; gap: 8px; }
+  .board-cols { grid-template-columns: 54px 38px 1fr 92px; gap: 8px; }
+  .row { grid-template-columns: 54px 38px 1fr 92px; gap: 8px; }
   .row-score, .nb-score { font-size: 12px; }
   .cd-value { font-size: 24px; }
   .list { height: 56vh; }

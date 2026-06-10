@@ -17,8 +17,10 @@ export function RankRow({ entry, isMe, onSelect, style }: {
       style={style}
       onClick={() => onSelect(entry.playerId)}
     >
-      <span className="row-rank">{entry.rank <= 3 ? '★' : `#${entry.rank}`}</span>
-      <span className="row-rankn">{entry.rank}</span>
+      <span className="row-rank-cell">
+        {entry.rank <= 3 && <span className="row-medal">★</span>}
+        <span className="row-rankn">{entry.rank}</span>
+      </span>
       <Avatar playerId={entry.playerId} name={entry.displayName} size={34} />
       <span className="row-name">
         {entry.displayName ?? entry.playerId.slice(0, 8)}

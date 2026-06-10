@@ -12,6 +12,7 @@ const EnvSchema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().int().default(10),
   RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().default(10),
   CORS_ORIGIN: z.string().default('*'),
+  DEMO_TRAFFIC: z.string().default('false'), // 'true' → generate light in-process earn traffic
 });
 
 export type Env = z.infer<typeof EnvSchema>;

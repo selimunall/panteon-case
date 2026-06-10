@@ -5,7 +5,8 @@ import { loadConfig } from './config.js';
 import { createRedis } from './db/redis.js';
 import { createPg } from './db/pg.js';
 import { createMongo } from './db/mongo.js';
-import { registerEarnCommand } from './services/earn.js';
+import { registerEarnCommand, applyEarn } from './services/earn.js';
+import { players } from './db/schema.js';
 import { runMigrations } from './db/migrate.js';
 import { runSeed } from './db/seed.js';
 import { seedClosedWeek } from './seed-history.js';
@@ -63,6 +64,27 @@ async function main(): Promise<void> {
       await processBatch(deps, weekId, consumer);
     }
   })();
+
+  // Optional in-process demo traffic so the deployed board visibly moves (no separate worker).
+  if (env.DEMO_TRAFFIC === 'true') {
+    const ids = (await pg.select({ id: players.id }).from(players)).map((r) => r.id);
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    console.log(`demo traffic on: ${ids.length} players`);
+    void (async () => {
+      while (ids.length > 0) {
+        const weekId = weekIdFor(new Date(), offset);
+        for (let i = 0; i < 4; i++) {
+          const playerId = ids[Math.floor(Math.random() * ids.length)]!;
+          const delta = Math.random() < 0.1 ? 20000 + Math.floor(Math.random() * 60000) : 500 + Math.floor(Math.random() * 6000);
+          await applyEarn(redis, {
+            weekId, playerId, delta, idempotencyKey: randomUUID(),
+            clientTs: Date.now(), poolRate: config.pool.rate, idempTtlSec: env.IDEMP_TTL_SEC,
+          }).catch(() => {});
+        }
+        await sleep(1500);
+      }
+    })();
+  }
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });

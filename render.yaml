@@ -40,7 +40,7 @@ services:
   - type: web
     name: panteon-client
     runtime: static
-    buildCommand: npx --yes pnpm@9.15.9 install --frozen-lockfile && npx --yes pnpm@9.15.9 --filter @panteon/client build
+    buildCommand: npx --yes pnpm@9.15.9 install --no-frozen-lockfile && npx --yes pnpm@9.15.9 --filter @panteon/client build
     staticPublishPath: client/dist
     routes:
       - type: rewrite

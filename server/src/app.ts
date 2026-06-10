@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import cors from '@fastify/cors';
 import type Redis from 'ioredis';
 import type { Db as MongoDb } from 'mongodb';
 import type { Config } from '@panteon/shared';
@@ -12,6 +13,9 @@ export interface AppDeps { redis: Redis; config: Config; env: Env; mongo: MongoD
 
 export function buildApp(deps: AppDeps): FastifyInstance {
   const app = Fastify({ logger: false });
+  app.register(cors, {
+    origin: deps.env.CORS_ORIGIN === '*' ? true : deps.env.CORS_ORIGIN.split(','),
+  });
   app.get('/health', async () => ({ status: 'ok' }));
   registerEarnRoute(app, deps);
   registerLeaderboardRoutes(app, deps);

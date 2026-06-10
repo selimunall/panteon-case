@@ -11,6 +11,7 @@ const EnvSchema = z.object({
   IDEMP_TTL_SEC: z.coerce.number().int().default(604800), // 7 days
   RATE_LIMIT_MAX: z.coerce.number().int().default(10),
   RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().default(10),
+  CORS_ORIGIN: z.string().default('*'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

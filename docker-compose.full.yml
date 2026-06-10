@@ -1,0 +1,64 @@
+# Whole system in containers, on an isolated Docker network — immune to host port conflicts.
+#   docker compose -f docker-compose.full.yml up --build          (base stack)
+#   docker compose -f docker-compose.full.yml --profile demo up    (also runs the mock load gen)
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment: { POSTGRES_USER: panteon, POSTGRES_PASSWORD: panteon, POSTGRES_DB: leaderboard }
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U panteon -d leaderboard"], interval: 2s, timeout: 3s, retries: 30 }
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 2s, timeout: 3s, retries: 30 }
+  mongo:
+    image: mongo:7
+    healthcheck: { test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"], interval: 2s, timeout: 3s, retries: 30 }
+
+  migrate:
+    build: { context: ., dockerfile: docker/server.Dockerfile }
+    command: >
+      sh -c "pnpm --filter @panteon/server migrate:prod &&
+             pnpm --filter @panteon/server seed:prod &&
+             pnpm --filter @panteon/server seed:history:prod"
+    environment: &appenv
+      DATABASE_URL: postgres://panteon:panteon@postgres:5432/leaderboard
+      REDIS_URL: redis://redis:6379
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: leaderboard
+      PORT: "3000"
+      CORS_ORIGIN: "*"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+
+  api:
+    build: { context: ., dockerfile: docker/server.Dockerfile }
+    command: pnpm --filter @panteon/server start:prod
+    environment: *appenv
+    ports: ["3001:3000"]   # host 3001 (3000 may be taken); the client reaches it as api:3000 in-network
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  worker:
+    build: { context: ., dockerfile: docker/server.Dockerfile }
+    command: pnpm --filter @panteon/server worker:prod
+    environment: *appenv
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  client:
+    build: { context: ., dockerfile: docker/client.Dockerfile }
+    environment: { API_UPSTREAM: http://api:3000 }
+    ports: ["8088:80"]
+    depends_on: [api]
+
+  mock:
+    profiles: ["demo"]
+    build: { context: ., dockerfile: docker/server.Dockerfile }
+    command: pnpm --filter @panteon/server mock 8 800
+    environment:
+      <<: *appenv
+      API_URL: http://api:3000
+    depends_on:
+      api: { condition: service_started }

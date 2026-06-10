@@ -11,7 +11,7 @@ import { weekIdFor } from './lib/week.js';
  */
 async function main(): Promise<void> {
   const env = loadEnv();
-  const base = `http://localhost:${env.PORT}`;
+  const base = process.env.API_URL ?? `http://localhost:${env.PORT}`;
   const perTick = Number(process.argv[2] ?? 10);
   const tickMs = Number(process.argv[3] ?? 700);
 

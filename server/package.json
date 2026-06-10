@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "start:prod": "tsx src/index.ts",
+    "start:all:prod": "tsx src/all.ts",
     "worker:prod": "tsx src/worker.ts",
     "migrate:prod": "tsx src/db/migrate.ts",
     "seed:prod": "tsx src/db/seed.ts",

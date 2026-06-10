@@ -56,7 +56,7 @@ services:
   mock:
     profiles: ["demo"]
     build: { context: ., dockerfile: docker/server.Dockerfile }
-    command: pnpm --filter @panteon/server mock 8 800
+    command: pnpm --filter @panteon/server mock:prod 8 800
     environment:
       <<: *appenv
       API_URL: http://api:3000

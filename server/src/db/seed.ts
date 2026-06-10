@@ -25,10 +25,18 @@ export async function runSeed(opts: SeedOptions): Promise<{ weekId: string; coun
   const mongo = await createMongo(opts.mongoUrl, opts.mongoDb);
 
   try {
+    // Idempotent: if this week is already seeded, do nothing (re-running migrate/seed on a
+    // deploy must not fabricate a second disjoint set of players).
+    const already = await db.select({ p: weeklyScores.playerId })
+      .from(weeklyScores).where(eq(weeklyScores.weekId, weekId)).limit(1);
+    if (already.length > 0) {
+      console.log(`week ${weekId} already seeded — skipping`);
+      return { weekId, count: 0 };
+    }
+
     await db.insert(weeks).values({ weekId, startsAt, endsAt, status: 'active' }).onConflictDoNothing();
 
-    // Idempotent re-seed: clear this week's scores AND the ZSET together, so re-running
-    // the seed leaves Postgres and Redis with the same rows (no divergence/accumulation).
+    // Clear this week's scores AND the ZSET together so a fresh seed stays consistent.
     await db.delete(weeklyScores).where(eq(weeklyScores.weekId, weekId));
     const zKey = `leaderboard:week:${weekId}`;
     await redis.del(zKey);

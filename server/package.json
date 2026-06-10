@@ -16,6 +16,7 @@
     "migrate:prod": "tsx src/db/migrate.ts",
     "seed:prod": "tsx src/db/seed.ts",
     "seed:history:prod": "tsx src/seed-history.ts",
+    "mock:prod": "tsx src/mock.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts"
